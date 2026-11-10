@@ -45,7 +45,7 @@ jobs:
       - name: Collect public ACP SLI listings
         if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.mode == 'collect'
         run: |
-          python agent.py --start 2023-11-10 --end 2026-11-10 collect --max-pages 100
+          python agent.py --start 2023-11-10 collect --max-pages 100
       - name: Add English translations (best effort)
         if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.mode == 'collect'
         run: python translate_records.py --limit 1500 --delay 0.3
