@@ -17,13 +17,33 @@ LOG = logging.getLogger("acp-translate")
 
 def ensure_columns(conn: sqlite3.Connection) -> None:
     columns = {r[1] for r in conn.execute("PRAGMA table_info(tenders)")}
-    for col in ("title_en", "title_en_source", "title_en_at"):
+    for col in ("title_en", "title_en_source", "title_en_at", "status_en", "procurement_type_en"):
         if col not in columns:
             conn.execute(f"ALTER TABLE tenders ADD COLUMN {col} TEXT")
     conn.commit()
 
+STATUS_EN = {
+    "ABIERTAS":"Open", "ANUNCIO VENCIDO":"Notice expired",
+    "CANCELACIÓN DEL ACTO":"Tender cancelled", "EVALUACIÓN":"Under evaluation",
+    "ENMENDADA":"Amended", "ACTO DESIERTO":"No award",
+    "ADJUDICACIÓN":"Awarded", "PRECALIFICACIÓN CONCLUÍDA":"Prequalification complete",
+}
+PROCUREMENT_TYPES_EN = {
+    "Licitación Pública":"Public tender",
+    "Licitación Pública Precio Mas Bajo":"Public tender — lowest price",
+    "Licitación Pública Precio Más Bajo":"Public tender — lowest price",
+}
+
+def update_labels(conn):
+    for original, english in STATUS_EN.items():
+        conn.execute("UPDATE tenders SET status_en=? WHERE status=?",(english,original))
+    for original, english in PROCUREMENT_TYPES_EN.items():
+        conn.execute("UPDATE tenders SET procurement_type_en=? WHERE procurement_type=?",(english,original))
+    conn.commit()
+
 def translate_pending(conn: sqlite3.Connection, limit: int, delay: float) -> dict:
     ensure_columns(conn)
+    update_labels(conn)
     from deep_translator import GoogleTranslator
     translator = GoogleTranslator(source="auto", target="en")
     rows = conn.execute("""
