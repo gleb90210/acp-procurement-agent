@@ -276,6 +276,8 @@ def connect(dbpath: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(dbpath))
     conn.row_factory = sqlite3.Row
     conn.executescript(CREATE_TABLES)
+    from translate_records import ensure_columns
+    ensure_columns(conn)
     return conn
 
 
@@ -307,7 +309,7 @@ def upsert(conn: sqlite3.Connection, item: dict[str, str], source: str, cutoff: 
             if k in canonical and not canonical[k]:
                 canonical[k] = prior
         # An older archived snapshot should not roll back a newer status.
-        if (source != 'ACP SLI public Excel export' and old['updated_at']
+        if (source != 'ACP SLI public HTML listing' and old['updated_at']
                 and incoming_updated and incoming_updated < old['updated_at']):
             canonical['status'] = previous.get('status', canonical['status'])
     payload = json.dumps(canonical, ensure_ascii=False, sort_keys=True)
@@ -377,7 +379,8 @@ def ingest_files(conn: sqlite3.Connection, files: list[Path], source: str, cutof
 
 def export_csv(conn: sqlite3.Connection, outpath: Path) -> int:
     outpath.parent.mkdir(parents=True, exist_ok=True)
-    cols = ['tender_id', 'title', 'status', 'category', 'procurement_type', 'purchasing_agent',
+    cols = ['tender_id', 'title', 'title_en', 'status', 'status_en', 'category',
+            'procurement_type', 'procurement_type_en', 'purchasing_agent',
             'purchasing_unit', 'published_at', 'updated_at', 'closes_at',
             'amendment_count', 'supplier', 'amount', 'source', 'source_url',
             'first_seen_at', 'last_seen_at', 'last_changed_at']
@@ -502,7 +505,7 @@ async def scrape_export(download_dir: Path, headless: bool, delay: float, inspec
     report['unique_records']=len(collected)
     (download_dir/'collection-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
     if report['errors']:
-        raise RuntimeError('ACP status collection errors: '+str(report['errors']))
+        LOG.warning('Partial collection: %d status(es) failed; successful statuses will still be saved',len(report['errors']))
     if not collected:
         raise RuntimeError('No tenders collected')
     target=download_dir/('acp_sli_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'.json')
@@ -555,7 +558,7 @@ def main() -> int:
             LOG.error('No downloaded exports; aborting.')
             return 1
         with connect(args.db) as conn:
-            stats = ingest_files(conn, files, 'ACP SLI public Excel export', args.start, args.end)
+            stats = ingest_files(conn, files, 'ACP SLI public HTML listing', args.start, args.end)
             LOG.info('Ingestion: %s', stats)
             if stats['errors'] or not stats['files']:
                 return 1
