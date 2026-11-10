@@ -18,6 +18,9 @@ on:
   schedule:
     # 08:00 America/Panama (UTC-5, no daylight saving time)
     - cron: '0 13 * * *'
+concurrency:
+  group: acp-sli-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
@@ -58,7 +61,7 @@ jobs:
           git config user.name 'ACP Procurement Agent'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git add data/procurements.sqlite data/procurements.csv
-          git diff --cached --quiet || (git commit -m 'Update ACP procurement database' && git push)
+          git diff --cached --quiet || (git commit -m 'Update ACP procurement database' && git pull --rebase origin main && git push)
       - name: Save downloads and inspection reports as artifacts
         if: always()
         uses: actions/upload-artifact@v4
