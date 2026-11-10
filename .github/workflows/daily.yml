@@ -14,6 +14,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/daily.yml'
+      - 'diagnose_portal.py'
   schedule:
     # 08:00 America/Panama (UTC-5, no daylight saving time)
     - cron: '0 13 * * *'
@@ -38,17 +39,20 @@ jobs:
       - name: Inspect the public portal (manual test mode)
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'inspect'
         run: python agent.py collect --inspect
+      - name: Diagnose search-by-status UI on workflow updates
+        if: github.event_name == 'push'
+        run: python diagnose_portal.py
       - name: Collect public ACP SLI export
-        if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.mode == 'collect'
+        if: github.event_name == 'schedule' || inputs.mode == 'collect'
         run: python agent.py --start 2023-11-10 --db data/procurements.sqlite collect --download-dir data/downloads
       - name: Create searchable CSV
-        if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.mode == 'collect'
+        if: github.event_name == 'schedule' || inputs.mode == 'collect'
         run: python agent.py --db data/procurements.sqlite export --out data/procurements.csv
       - name: Show collected coverage
-        if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.mode == 'collect'
+        if: github.event_name == 'schedule' || inputs.mode == 'collect'
         run: python agent.py --db data/procurements.sqlite stats
       - name: Commit updated data
-        if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.mode == 'collect'
+        if: github.event_name == 'schedule' || inputs.mode == 'collect'
         run: |
           git config user.name 'ACP Procurement Agent'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
