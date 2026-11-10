@@ -14,7 +14,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/daily.yml'
-      - 'diagnose_portal.py'
+      - 'translate_records.py'
   schedule:
     # 08:00 America/Panama (UTC-5, no daylight saving time)
     - cron: '0 13 * * *'
@@ -23,7 +23,7 @@ permissions:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -42,11 +42,10 @@ jobs:
       - name: Collect public ACP SLI listings
         if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.mode == 'collect'
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            python agent.py --start 2023-11-10 collect --statuses ABIERTAS ADJUDICACIÓN --max-pages 2
-          else
-            python agent.py --start 2023-11-10 collect --max-pages 30
-          fi
+          python agent.py --start 2023-11-10 --end 2026-11-10 collect --max-pages 100
+      - name: Add English translations (best effort)
+        if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.mode == 'collect'
+        run: python translate_records.py --limit 1500 --delay 0.3
       - name: Create searchable CSV
         if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.mode == 'collect'
         run: python agent.py --db data/procurements.sqlite export --out data/procurements.csv
