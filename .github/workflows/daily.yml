@@ -1,0 +1,60 @@
+name: ACP procurement daily sync
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Inspect the portal first, then select Collect when verified'
+        required: true
+        default: inspect
+        type: choice
+        options:
+          - inspect
+          - collect
+  schedule:
+    # 08:00 America/Panama (UTC-5, no daylight saving time)
+    - cron: '0 13 * * *'
+permissions:
+  contents: write
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+      - name: Test database and parsing logic
+        run: python -m unittest discover -s tests -v
+      - name: Inspect the public portal (manual test mode)
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'inspect'
+        run: python agent.py collect --inspect
+      - name: Collect public ACP SLI export
+        if: github.event_name == 'schedule' || inputs.mode == 'collect'
+        run: python agent.py --start 2023-11-10 --db data/procurements.sqlite collect --download-dir data/downloads
+      - name: Create searchable CSV
+        if: github.event_name == 'schedule' || inputs.mode == 'collect'
+        run: python agent.py --db data/procurements.sqlite export --out data/procurements.csv
+      - name: Show collected coverage
+        if: github.event_name == 'schedule' || inputs.mode == 'collect'
+        run: python agent.py --db data/procurements.sqlite stats
+      - name: Commit updated data
+        if: github.event_name == 'schedule' || inputs.mode == 'collect'
+        run: |
+          git config user.name 'ACP Procurement Agent'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add data/procurements.sqlite data/procurements.csv
+          git diff --cached --quiet || (git commit -m 'Update ACP procurement database' && git push)
+      - name: Save downloads and inspection reports as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acp-sli-results-${{ github.run_number }}
+          path: data/downloads/
+          retention-days: 30
+          if-no-files-found: ignore
