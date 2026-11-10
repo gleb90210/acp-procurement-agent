@@ -1,5 +1,14 @@
 # ACP Procurement Intelligence Agent — prototype
 
+## Current live deployment (November 10, 2026)
+
+The collector now parses ACP public HTML tender cards, not an Excel button. A limited two-status run successfully stored 40 real tenders. A broader eight-status scan is configured with an inclusive publication-date filter **2023-11-10 to 2026-11-10**, and at most 100 pages per status.
+
+**Date filtering is not historical access:** the scraper only collects records currently visible on the ACP portal. It cannot reconstruct unpublished 2023–2025 tenders. ACP archival exports or official datasets are required for verifiable three-year completeness. Inspect `data/downloads/collection-report.json` in each workflow artifact for status-level page counts, errors and truncation flags.
+
+Bilingual export fields now include `title` (original Spanish), `title_en` (machine-translated English), `status_en`, and `procurement_type_en`. English titles are generated with an external translation service on a best-effort basis, at a bounded number per run, and can remain blank if unavailable. Original Spanish records are retained. Do not treat machine translations as certified. The source data are public, but note that the GitHub repository is currently public too.
+
+
 A deployable Python collector and SQLite database for public records from the **Autoridad del Canal de Panamá (ACP) Sistema de Licitaciones por Internet (SLI)**.
 
 **Project status (2026-11-10):** Database ingestion, date filtering, versioning, deduplication, and CSV export were tested using **synthetic test data only**. The public-portal browser download has **not** been live-tested because the build environment cannot establish a browser/network connection to `apps.pancanal.com`. The script does not claim to contain any real ACP tender records yet.
