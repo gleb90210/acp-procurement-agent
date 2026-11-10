@@ -391,67 +391,123 @@ def export_csv(conn: sqlite3.Connection, outpath: Path) -> int:
     return count
 
 
-async def scrape_export(download_dir: Path, headless: bool, delay: float, inspect_only: bool) -> list[Path]:
-    """Use public SLI UI's Excel export; no undocumented API or auth bypass.
+def parse_listing_html(html: str, status: str, base_url: str = BASE_URL) -> list[dict[str, str]]:
+    """Parse ACP HTML tender cards: there is no Excel button on results pages."""
+    from bs4 import BeautifulSoup
+    from urllib.parse import urljoin
+    soup = BeautifulSoup(html, 'html.parser')
+    entries = []
+    for anchor in soup.select('p.id a'):
+        tender_id = anchor.get_text(' ', strip=True)
+        if not re.fullmatch(r'[A-Za-z0-9-]{3,80}', tender_id):
+            continue
+        row = anchor.find_parent('div', class_='row')
+        while row and not (row.select_one('p.title strong') and row.select_one('p.sub-title')):
+            row = row.find_parent('div', class_='row')
+        if not row:
+            continue
+        title = row.select_one('p.title strong')
+        item = {'tender_id': tender_id, 'title': title.get_text(' ', strip=True),
+                'status': status, 'source_url': base_url}
+        detail = anchor.get('orig_href') or ''
+        if detail.startswith('/sli/'):
+            item['source_url'] = urljoin(base_url, detail)
+        for label in row.select('p.sub-title'):
+            field = column_for(label.get_text(' ', strip=True))
+            container = label.find_parent('div')
+            if field and container:
+                next_col = container.find_next_sibling('div')
+                if next_col:
+                    item[field] = next_col.get_text(' ', strip=True)
+        right = row.select_one('div.col-lg-3 span.pull-right')
+        if right:
+            item['procurement_type'] = right.get_text(' ', strip=True)
+        entries.append(item)
+    return entries
 
-    This entry point has NOT been live-tested in this environment because remote
-    browser access to apps.pancanal.com is blocked. Run --inspect on a machine
-    with Internet access to diagnose controls before unattended operation.
-    """
+
+async def scrape_export(download_dir: Path, headless: bool, delay: float, inspect_only: bool,
+                        statuses: list[str] | None = None, max_pages: int = 30) -> list[Path]:
+    """Collect publicly listed tender cards by status and ordinary page navigation."""
     from playwright.async_api import async_playwright
     download_dir.mkdir(parents=True, exist_ok=True)
-    files = []
+    if statuses is None:
+        statuses = ['ABIERTAS','ANUNCIO VENCIDO','CANCELACIÓN DEL ACTO','EVALUACIÓN',
+                    'ENMENDADA','ACTO DESIERTO','ADJUDICACIÓN','PRECALIFICACIÓN CONCLUÍDA']
+    if not 1 <= max_pages <= 100:
+        raise ValueError('Invalid maximum page count')
+    report = {'statuses': {}, 'errors': [], 'collected_at': utcnow()}
+    collected = {}
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=headless)
         context = await browser.new_context(accept_downloads=True, locale='es-PA', timezone_id='America/Panama')
-        page = await context.new_page()
-        await page.goto(BASE_URL, wait_until='domcontentloaded', timeout=90000)
-        await page.wait_for_timeout(3000)
-        if inspect_only:
-            # Does not expose credentials/cookies. A browser screenshot + form inventory.
-            await page.screenshot(path=str(download_dir / 'portal-inspection.png'), full_page=True)
-            forms = await page.evaluate('''() => ({url: location.href,
-                selects: [...document.querySelectorAll('select')].map((e,i)=>({i,options:[...e.options].map(x=>x.textContent.trim())})),
-                buttons: [...document.querySelectorAll('button,input[type=button],input[type=submit],a')]
-                  .map(e=>({tag:e.tagName,text:(e.textContent||e.value||'').trim()})).filter(x=>x.text).slice(0,100)})''')
-            (download_dir / 'portal-inspection.json').write_text(json.dumps(forms, ensure_ascii=False, indent=2), encoding='utf-8')
-            LOG.info('Saved screenshot and form inventory to %s', download_dir)
+        try:
+            if inspect_only:
+                page = await context.new_page()
+                await page.goto(BASE_URL, wait_until='domcontentloaded', timeout=90000)
+                await page.wait_for_timeout(1500)
+                await page.screenshot(path=str(download_dir / 'portal-inspection.png'), full_page=True)
+                forms = await page.evaluate("""() => ({url: location.href,
+                    selects: [...document.querySelectorAll('select')].map((e,i)=>({i,options:[...e.options].map(x=>x.textContent.trim())}))})""")
+                (download_dir / 'portal-inspection.json').write_text(json.dumps(forms,ensure_ascii=False,indent=2),encoding='utf-8')
+                await page.close()
+                return []
+            for status in statuses:
+                page = await context.new_page()
+                stat = {'pages':0,'records':0,'truncated':False}
+                report['statuses'][status] = stat
+                try:
+                    await page.goto(BASE_URL, wait_until='domcontentloaded', timeout=90000)
+                    await page.wait_for_timeout(900)
+                    await page.locator('select').first.select_option(label=status)
+                    await page.locator('input[value="Desplegar resultado"]').first.click(timeout=15000)
+                    await page.wait_for_load_state('domcontentloaded',timeout=60000)
+                    await page.wait_for_timeout(900)
+                    signatures = set()
+                    for page_number in range(1,max_pages+1):
+                        rows = parse_listing_html(await page.content(),status,page.url)
+                        if not rows:
+                            text = (await page.locator('body').inner_text())[:1500]
+                            if 'no es posible realizar esta búsqueda' in text:
+                                raise RuntimeError('Portal refused status search '+status)
+                            if page_number == 1:
+                                LOG.warning('No cards in status %s, recording empty status',status)
+                            break
+                        signature = tuple(r['tender_id'] for r in rows)
+                        if signature in signatures:
+                            raise RuntimeError('Repeated page in status '+status)
+                        signatures.add(signature)
+                        for r in rows:
+                            collected[r['tender_id']] = r
+                        stat['pages'] += 1
+                        stat['records'] += len(rows)
+                        LOG.info('status=%s page=%d cards=%d unique=%d',status,page_number,len(rows),len(collected))
+                        next_link = page.locator('a[orig_href$="pagina='+str(page_number+1)+'"]').first
+                        if not await next_link.count():
+                            break
+                        if page_number == max_pages:
+                            stat['truncated']=True
+                            break
+                        await next_link.click(timeout=15000)
+                        await page.wait_for_timeout(max(800,int(delay*1000)))
+                except Exception as exc:
+                    LOG.exception('Failed status %s',status)
+                    report['errors'].append({'status':status,'error':str(exc)})
+                    await page.screenshot(path=str(download_dir / ('failed-'+str(len(report['errors']))+'.png')),full_page=True)
+                finally:
+                    await page.close()
+                await asyncio.sleep(1)
+        finally:
             await browser.close()
-            return []
-
-        # Select 'all' if a native status selector exposes it, otherwise keep defaults.
-        selects = page.locator('select')
-        for i in range(await selects.count()):
-            opts = await selects.nth(i).locator('option').all_text_contents()
-            if any(re.search(r'(?i)abiertas|evaluaci[oó]n|adjudicaci[oó]n|estatus', v) for v in opts):
-                idx = next((j for j, v in enumerate(opts) if re.search(r'(?i)desplegar todos|todos|all', v)), None)
-                if idx is not None:
-                    await selects.nth(i).select_option(index=idx)
-                break
-        search_btn = page.get_by_role('button', name=re.compile(r'desplegar resultado|show results', re.I))
-        if await search_btn.count() == 0:
-            search_btn = page.locator('input[value*="Desplegar resultado"],button:has-text("Desplegar resultado")')
-        if not await search_btn.count():
-            raise RuntimeError('SLI search button not found. Run collect --inspect and inspect page.')
-        await search_btn.first.click()
-        await page.wait_for_load_state('domcontentloaded', timeout=60000)
-        await page.wait_for_timeout(2000)
-        excel = page.get_by_text(re.compile(r'^\s*Excel\s*$', re.I)).first
-        if not await excel.count():
-            await page.screenshot(path=str(download_dir / 'no-excel.png'), full_page=True)
-            raise RuntimeError('No Excel export control found after search. Inspect no-excel.png.')
-        timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-        async with page.expect_download(timeout=90000) as future_download:
-            await excel.click()
-        dl = await future_download.value
-        suffix = Path(dl.suggested_filename).suffix.lower() or '.xlsx'
-        target = download_dir / f'acp_sli_{timestamp}{suffix}'
-        await dl.save_as(str(target))
-        LOG.info('Downloaded %s (%d bytes)', target, target.stat().st_size)
-        files.append(target)
-        await page.wait_for_timeout(max(5.0, delay) * 1000)
-        await browser.close()
-    return files
+    report['unique_records']=len(collected)
+    (download_dir/'collection-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+    if report['errors']:
+        raise RuntimeError('ACP status collection errors: '+str(report['errors']))
+    if not collected:
+        raise RuntimeError('No tenders collected')
+    target=download_dir/('acp_sli_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'.json')
+    target.write_text(json.dumps({'records':list(collected.values())},ensure_ascii=False,indent=2),encoding='utf-8')
+    return [target]
 
 
 def summary(conn: sqlite3.Connection) -> dict:
@@ -472,7 +528,9 @@ def main() -> int:
     collect.add_argument('--download-dir', type=Path, default=Path('data/downloads'))
     collect.add_argument('--headed', action='store_true')
     collect.add_argument('--inspect', action='store_true', help='Only screenshot and inventory portal form')
-    collect.add_argument('--delay', type=float, default=8.0)
+    collect.add_argument('--delay', type=float, default=1.0)
+    collect.add_argument('--statuses', nargs='+', default=None)
+    collect.add_argument('--max-pages', type=int, default=30)
     ingest = sub.add_parser('ingest', help='Import ACP Excel, CSV or JSON files')
     ingest.add_argument('files', type=Path, nargs='+')
     ingest.add_argument('--source', default='ACP historical export')
@@ -487,7 +545,7 @@ def main() -> int:
         parser.error('--start must be earlier than --end')
     if args.cmd == 'collect':
         try:
-            files = asyncio.run(scrape_export(args.download_dir, not args.headed, args.delay, args.inspect))
+            files = asyncio.run(scrape_export(args.download_dir, not args.headed, args.delay, args.inspect, args.statuses, args.max_pages))
         except Exception:
             LOG.exception('Public SLI collection failed (no successful retrieval will be reported)')
             return 1
