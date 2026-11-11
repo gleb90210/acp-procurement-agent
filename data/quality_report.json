@@ -1,0 +1,73 @@
+{
+  "generated_utc": "2026-11-11T01:20:45+00:00",
+  "scope": "Accessible public ACP SLI listings, not an independently complete three-year archive",
+  "requested_earliest_publication_date": "2023-11-10",
+  "record_count": 1213,
+  "actual_earliest_publication_date": "2023-12-15",
+  "actual_latest_publication_date": "2026-11-09",
+  "counts_by_status": {
+    "ABIERTAS": 77,
+    "ACTO DESIERTO": 125,
+    "ADJUDICACIÓN": 856,
+    "ANUNCIO VENCIDO": 73,
+    "CANCELACIÓN DEL ACTO": 8,
+    "EVALUACIÓN": 74
+  },
+  "field_coverage": {
+    "title": {
+      "present": 1212,
+      "missing": 1
+    },
+    "title_en": {
+      "present": 1212,
+      "missing": 1
+    },
+    "status": {
+      "present": 1213,
+      "missing": 0
+    },
+    "status_en": {
+      "present": 1213,
+      "missing": 0
+    },
+    "category": {
+      "present": 0,
+      "missing": 1213
+    },
+    "procurement_type": {
+      "present": 1213,
+      "missing": 0
+    },
+    "procurement_type_en": {
+      "present": 1213,
+      "missing": 0
+    },
+    "published_at": {
+      "present": 1161,
+      "missing": 52
+    },
+    "purchasing_agent": {
+      "present": 1213,
+      "missing": 0
+    },
+    "purchasing_unit": {
+      "present": 1213,
+      "missing": 0
+    },
+    "supplier": {
+      "present": 0,
+      "missing": 1213
+    },
+    "amount": {
+      "present": 0,
+      "missing": 1213
+    }
+  },
+  "english_title_translated": 1212,
+  "english_title_pending": 0,
+  "limitations": [
+    "Categories, award suppliers and amounts are not available in the captured summary card fields; blanks must not be interpreted as zero.",
+    "Procurements absent from the public portal cannot be reconstructed by filtering for a three-year date range.",
+    "Original Spanish titles are retained; English titles are machine translated and may require review."
+  ]
+}
