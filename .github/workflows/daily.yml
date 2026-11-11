@@ -3,66 +3,65 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Inspect the portal first, then select Collect when verified'
+        description: "Inspect or collect ACP tenders"
         required: true
-        default: inspect
         type: choice
-        options:
-          - inspect
-          - collect
+        default: collect
+        options: [collect, inspect]
   push:
     branches: [main]
     paths:
       - '.github/workflows/daily.yml'
-      - 'translate_records.py'
   schedule:
-    # 08:00 America/Panama (UTC-5, no daylight saving time)
-    - cron: '0 13 * * *'
+    - cron: '0 13 * * *' # 08:00 Panama time
+permissions:
+  contents: write
 concurrency:
   group: acp-sli-${{ github.ref }}
   cancel-in-progress: true
-permissions:
-  contents: write
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
           python -m playwright install --with-deps chromium
-      - name: Test database and parsing logic
+      - name: Run collector regression tests
         run: python -m unittest discover -s tests -v
-      - name: Inspect the public portal (manual test mode)
+      - name: Inspect portal
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'inspect'
         run: python agent.py collect --inspect
-      - name: Collect public ACP SLI listings
-        if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.mode == 'collect'
-        run: |
-          python agent.py --start 2023-11-10 collect --max-pages 100
-      - name: Add English translations (best effort)
-        if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.mode == 'collect'
-        run: python translate_records.py --limit 1500 --delay 0.3
-      - name: Create searchable CSV
-        if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.mode == 'collect'
-        run: python agent.py --db data/procurements.sqlite export --out data/procurements.csv
-      - name: Show collected coverage
-        if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.mode == 'collect'
-        run: python agent.py --db data/procurements.sqlite stats
-      - name: Commit updated data
-        if: github.event_name == 'schedule' || github.event_name == 'push' || inputs.mode == 'collect'
+      - name: Collect current public tenders in requested date window
+        if: github.event_name != 'workflow_dispatch' || inputs.mode == 'collect'
+        run: python agent.py --start 2023-11-10 collect --max-pages 100
+      - name: Translate tender titles offline (record any failure)
+        id: translate
+        if: github.event_name != 'workflow_dispatch' || inputs.mode == 'collect'
+        continue-on-error: true
+        run: python translate_records.py --limit 5000
+      - name: Export full database CSV
+        if: github.event_name != 'workflow_dispatch' || inputs.mode == 'collect'
+        run: python agent.py export
+      - name: Export clean bilingual CSV and coverage report
+        if: github.event_name != 'workflow_dispatch' || inputs.mode == 'collect'
+        run: python export_clean.py
+      - name: Show collection coverage
+        if: github.event_name != 'workflow_dispatch' || inputs.mode == 'collect'
+        run: python agent.py stats
+      - name: Save updated data files to GitHub
+        if: github.event_name != 'workflow_dispatch' || inputs.mode == 'collect'
         run: |
           git config user.name 'ACP Procurement Agent'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add data/procurements.sqlite data/procurements.csv
-          git diff --cached --quiet || (git commit -m 'Update ACP procurement database' && git pull --rebase origin main && git push)
-      - name: Save downloads and inspection reports as artifacts
+          git add data/procurements.sqlite data/procurements.csv data/procurements_clean.csv data/quality_report.json
+          git diff --cached --quiet || (git commit -m 'Update ACP bilingual procurement data and coverage report' && git pull --rebase origin main && git push)
+      - name: Upload source collection diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -70,3 +69,6 @@ jobs:
           path: data/downloads/
           retention-days: 30
           if-no-files-found: ignore
+      - name: Verify complete English translations
+        if: github.event_name != 'workflow_dispatch' || inputs.mode == 'collect'
+        run: python export_clean.py --require-english
