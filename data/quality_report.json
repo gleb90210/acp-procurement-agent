@@ -1,69 +1,69 @@
 {
-  "generated_utc": "2026-11-13T20:15:02+00:00",
+  "generated_utc": "2026-11-14T18:41:03+00:00",
   "scope": "Accessible public ACP SLI listings, not an independently complete three-year archive",
   "requested_earliest_publication_date": "2023-11-10",
-  "record_count": 1258,
+  "record_count": 1263,
   "actual_earliest_publication_date": "2023-12-15",
   "actual_latest_publication_date": "2026-11-13",
   "counts_by_status": {
-    "ABIERTAS": 78,
+    "ABIERTAS": 82,
     "ACTO DESIERTO": 129,
     "ADJUDICACIÓN": 885,
     "ANUNCIO VENCIDO": 75,
     "CANCELACIÓN DEL ACTO": 8,
-    "EVALUACIÓN": 83
+    "EVALUACIÓN": 84
   },
   "field_coverage": {
     "title": {
-      "present": 1257,
+      "present": 1262,
       "missing": 1
     },
     "title_en": {
-      "present": 1257,
+      "present": 1262,
       "missing": 1
     },
     "status": {
-      "present": 1258,
+      "present": 1263,
       "missing": 0
     },
     "status_en": {
-      "present": 1258,
+      "present": 1263,
       "missing": 0
     },
     "category": {
       "present": 0,
-      "missing": 1258
+      "missing": 1263
     },
     "procurement_type": {
-      "present": 1258,
+      "present": 1263,
       "missing": 0
     },
     "procurement_type_en": {
-      "present": 1258,
+      "present": 1263,
       "missing": 0
     },
     "published_at": {
-      "present": 1206,
+      "present": 1211,
       "missing": 52
     },
     "purchasing_agent": {
-      "present": 1258,
+      "present": 1263,
       "missing": 0
     },
     "purchasing_unit": {
-      "present": 1258,
+      "present": 1263,
       "missing": 0
     },
     "supplier": {
       "present": 0,
-      "missing": 1258
+      "missing": 1263
     },
     "amount": {
       "present": 0,
-      "missing": 1258
+      "missing": 1263
     }
   },
-  "english_title_translated": 1257,
+  "english_title_translated": 1262,
   "english_title_pending": 0,
   "limitations": [
     "Categories, award suppliers and amounts are not available in the captured summary card fields; blanks must not be interpreted as zero.",
