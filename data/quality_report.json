@@ -1,69 +1,69 @@
 {
-  "generated_utc": "2026-11-24T00:34:11+00:00",
+  "generated_utc": "2026-11-24T22:55:42+00:00",
   "scope": "Accessible public ACP SLI listings, not an independently complete three-year archive",
   "requested_earliest_publication_date": "2023-11-10",
-  "record_count": 1358,
+  "record_count": 1361,
   "actual_earliest_publication_date": "2023-12-15",
-  "actual_latest_publication_date": "2026-11-23",
+  "actual_latest_publication_date": "2026-11-24",
   "counts_by_status": {
-    "ABIERTAS": 94,
-    "ACTO DESIERTO": 136,
-    "ADJUDICACIÓN": 943,
-    "ANUNCIO VENCIDO": 74,
+    "ABIERTAS": 83,
+    "ACTO DESIERTO": 138,
+    "ADJUDICACIÓN": 954,
+    "ANUNCIO VENCIDO": 73,
     "CANCELACIÓN DEL ACTO": 8,
-    "EVALUACIÓN": 103
+    "EVALUACIÓN": 105
   },
   "field_coverage": {
     "title": {
-      "present": 1357,
+      "present": 1360,
       "missing": 1
     },
     "title_en": {
-      "present": 1357,
+      "present": 1360,
       "missing": 1
     },
     "status": {
-      "present": 1358,
+      "present": 1361,
       "missing": 0
     },
     "status_en": {
-      "present": 1358,
+      "present": 1361,
       "missing": 0
     },
     "category": {
       "present": 0,
-      "missing": 1358
+      "missing": 1361
     },
     "procurement_type": {
-      "present": 1358,
+      "present": 1361,
       "missing": 0
     },
     "procurement_type_en": {
-      "present": 1358,
+      "present": 1361,
       "missing": 0
     },
     "published_at": {
-      "present": 1306,
+      "present": 1309,
       "missing": 52
     },
     "purchasing_agent": {
-      "present": 1358,
+      "present": 1361,
       "missing": 0
     },
     "purchasing_unit": {
-      "present": 1358,
+      "present": 1361,
       "missing": 0
     },
     "supplier": {
       "present": 0,
-      "missing": 1358
+      "missing": 1361
     },
     "amount": {
       "present": 0,
-      "missing": 1358
+      "missing": 1361
     }
   },
-  "english_title_translated": 1357,
+  "english_title_translated": 1360,
   "english_title_pending": 0,
   "limitations": [
     "Categories, award suppliers and amounts are not available in the captured summary card fields; blanks must not be interpreted as zero.",
