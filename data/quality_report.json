@@ -1,17 +1,17 @@
 {
-  "generated_utc": "2026-11-26T22:05:31+00:00",
+  "generated_utc": "2026-11-27T21:49:02+00:00",
   "scope": "Accessible public ACP SLI listings, not an independently complete three-year archive",
   "requested_earliest_publication_date": "2023-11-10",
   "record_count": 1386,
   "actual_earliest_publication_date": "2023-12-15",
   "actual_latest_publication_date": "2026-11-26",
   "counts_by_status": {
-    "ABIERTAS": 74,
+    "ABIERTAS": 71,
     "ACTO DESIERTO": 140,
     "ADJUDICACIÓN": 974,
     "ANUNCIO VENCIDO": 72,
     "CANCELACIÓN DEL ACTO": 9,
-    "EVALUACIÓN": 117
+    "EVALUACIÓN": 120
   },
   "field_coverage": {
     "title": {
